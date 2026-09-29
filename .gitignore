@@ -1,0 +1,17 @@
+# Corpus do OWASP Benchmark (obtido do repositório oficial, ver README)
+testcode/
+expectedresults-1.2.csv
+
+# Saída bruta dos experimentos — manter apenas os resultados consolidados
+resultados/*.jsonl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
