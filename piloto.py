@@ -1,4 +1,4 @@
-﻿"""
+"""
 Estudo piloto - deteccao de vulnerabilidades com modelos de linguagem locais
 TCC - Analise Comparativa entre Ferramentas SAST e Modelos de Linguagem
 
@@ -41,16 +41,16 @@ SEMENTE = 42                                  # amostragem reproduzivel
 # PROMPT  (fixo - reproduzir em apendice conforme a metodologia)
 # --------------------------------------------------------------------------
 
-PROMPT = """Analise o cÃ³digo Java a seguir e determine se ele contÃ©m uma vulnerabilidade de seguranÃ§a.
+PROMPT = """Analise o código Java a seguir e determine se ele contém uma vulnerabilidade de segurança.
 
 Responda exclusivamente com um objeto JSON no formato:
 {{"vulnerable": true, "cwe": 89}}
 ou
 {{"vulnerable": false, "cwe": null}}
 
-O campo "cwe" deve conter o identificador numÃ©rico da CWE correspondente Ã  vulnerabilidade encontrada, ou null caso nÃ£o haja vulnerabilidade. NÃ£o inclua explicaÃ§Ã£o, comentÃ¡rios, marcaÃ§Ã£o markdown ou qualquer texto fora do objeto JSON.
+O campo "cwe" deve conter o identificador numérico da CWE correspondente à vulnerabilidade encontrada, ou null caso não haja vulnerabilidade. Não inclua explicação, comentários, marcação markdown ou qualquer texto fora do objeto JSON.
 
-CÃ³digo:
+Código:
 {codigo}"""
 
 # --------------------------------------------------------------------------
