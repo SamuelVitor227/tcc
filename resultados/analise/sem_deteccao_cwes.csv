@@ -1,0 +1,8 @@
+modelo,categoria,cwe_esperada,cwe_reportada,casos,pct_dos_reais
+Qwen2.5-Coder 7B,hash,328,327,3,2.33
+Llama 3.1 8B,crypto,327,89,130,100.00
+Llama 3.1 8B,hash,328,89,129,100.00
+Llama 3.1 8B,weakrand,330,89,147,67.43
+Llama 3.1 8B,weakrand,330,327,54,24.77
+Llama 3.1 8B,weakrand,330,328,3,1.38
+Llama 3.1 8B,trustbound,501,89,81,97.59

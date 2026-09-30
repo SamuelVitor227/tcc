@@ -1,0 +1,10 @@
+Modelo,Categoria,CWE,Reais,Reais_vulneravel,Reais_vulneravel_pct,Negativos,Negativos_vulneravel,Negativos_vulneravel_pct,Reais_cwe_correta,Negativos_cwe_correta
+Qwen2.5-Coder 14B,cmdi,78,126,126,100.00,125,125,100.00,126,125
+Qwen2.5-Coder 14B,sqli,89,272,271,99.63,232,225,96.98,271,225
+Qwen2.5-Coder 14B,xpathi,643,15,14,93.33,20,16,80.00,14,16
+Qwen2.5-Coder 7B,cmdi,78,126,126,100.00,125,125,100.00,126,125
+Qwen2.5-Coder 7B,sqli,89,272,272,100.00,232,232,100.00,272,232
+Qwen2.5-Coder 7B,xpathi,643,15,15,100.00,20,20,100.00,15,20
+Llama 3.1 8B,cmdi,78,126,126,100.00,125,125,100.00,21,14
+Llama 3.1 8B,sqli,89,272,272,100.00,232,232,100.00,272,232
+Llama 3.1 8B,xpathi,643,15,15,100.00,20,20,100.00,15,20

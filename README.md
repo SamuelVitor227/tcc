@@ -61,6 +61,7 @@ tcc/
 ├── repeticoes.py              # repetições do corpus completo (mesmo prompt da v2)
 ├── analise.py                 # métricas consolidadas, por CWE, tempo e concordância
 ├── estabilidade.py            # variação das respostas entre repetições
+├── criterio_cwe.py            # efeito do critério de CWE exata sobre as métricas
 ├── para_sarif.py              # converte a saída bruta para SARIF 2.1.0
 ├── ver.py                     # inspeção das respostas brutas
 ├── benchmarkutils/
@@ -147,6 +148,7 @@ nunca é sobrescrito, e a repetição correspondente é pulada.
 python analise.py      # tabelas em resultados/analise/
 python para_sarif.py   # SARIF em resultados/sarif/
 python estabilidade.py # estabilidade entre repetições, em resultados/analise/
+python criterio_cwe.py # métricas sem exigir CWE exata, em resultados/analise/
 ```
 
 Os scripts só leem os `.jsonl`; a saída bruta nunca é alterada. Ela é versionada no
@@ -259,6 +261,88 @@ Qwen, a CWE divergiu em apenas 3 (14B) e 18 (7B) respostas.
 | Qwen2.5-Coder 14B | 2,70 s | 2,71 s | 2,06 h |
 | Qwen2.5-Coder 7B | 2,38 s | 2,38 s | 1,81 h |
 | Llama 3.1 8B | 2,39 s | 2,39 s | 1,82 h |
+
+### Critério de CWE exata
+
+O critério do OWASP Benchmark só conta a detecção se a CWE apontada for a esperada.
+Para verificar se isso distorce a medição, `criterio_cwe.py` reclassifica as
+respostas da execução v2 sem essa exigência: basta `vulnerable: true` no caso real
+(TP) ou no negativo (FP).
+
+| Modelo | Critério | TPR | FPR | Precisão | F1 | Score | Score (OWASP) |
+|---|---|---|---|---|---|---|---|
+| Qwen2.5-Coder 14B | CWE exata | 0,588 | 0,480 | 0,567 | 0,577 | 10,8 | 14,3 |
+| | Sem CWE | 0,589 | 0,481 | 0,567 | 0,578 | 10,9 | 14,4 |
+| Qwen2.5-Coder 7B | CWE exata | 0,558 | 0,497 | 0,545 | 0,551 | 6,1 | 8,4 |
+| | Sem CWE | 0,566 | 0,501 | 0,547 | 0,556 | 6,5 | 9,6 |
+| Llama 3.1 8B | CWE exata | 0,418 | 0,358 | 0,554 | 0,476 | 5,9 | 10,5 |
+| | Sem CWE | 0,994 | 0,970 | 0,523 | 0,685 | 2,5 | 2,4 |
+
+**Nos Qwen, o critério quase não pesa.** A CWE apontada é quase sempre a esperada,
+e sem a exigência o Score sobe apenas 0,1 ponto no 14B e 0,4 no 7B.
+
+**No Llama, o critério sem CWE mostra que o veredito não discrimina.** Sem exigir a
+CWE, ele aponta 1.407 dos 1.415 casos reais, mas também 1.285 dos 1.325 negativos: o
+TPR vai a 0,994 e o FPR a 0,970, e o Score cai de 5,9 para 2,5 (OWASP: de 10,5 para
+2,4). O pouco de discriminação que o modelo tem está na CWE escolhida. Em cookie
+inseguro, por exemplo, ele responde CWE-614 em 29 dos 36 casos reais e CWE-89 em 27
+dos 31 negativos. O critério de CWE exata, portanto, não penaliza o Llama: é ele que
+captura o único sinal do modelo.
+
+A desagregação por categoria sob o critério sem CWE está em
+`resultados/analise/por_cwe_sem_cwe.csv`.
+
+#### Categorias sem detecção
+
+Nos casos reais de criptografia fraca, hash fraco, aleatoriedade fraca e fronteira de
+confiança, a hipótese de que os modelos reportariam CWEs vizinhas (CWE-338 no lugar de
+CWE-330, CWE-327 no lugar de CWE-328) não se confirma:
+
+| Modelo | Categoria | Casos reais | `vulnerable: false` | Outra CWE | CWE esperada |
+|---|---|---|---|---|---|
+| Qwen2.5-Coder 14B | crypto (327) | 130 | 130 | 0 | 0 |
+| | hash (328) | 129 | 127 | 0 | 2 |
+| | weakrand (330) | 218 | 218 | 0 | 0 |
+| | trustbound (501) | 83 | 83 | 0 | 0 |
+| Qwen2.5-Coder 7B | crypto (327) | 130 | 130 | 0 | 0 |
+| | hash (328) | 129 | 126 | 3 (CWE-327) | 0 |
+| | weakrand (330) | 218 | 218 | 0 | 0 |
+| | trustbound (501) | 83 | 82 | 0 | 1 |
+| Llama 3.1 8B | crypto (327) | 130 | 0 | 130 (CWE-89) | 0 |
+| | hash (328) | 129 | 0 | 129 (CWE-89) | 0 |
+| | weakrand (330) | 218 | 6 | 204 (CWE-89: 147, CWE-327: 54, CWE-328: 3) | 8 |
+| | trustbound (501) | 83 | 2 | 81 (CWE-89) | 0 |
+
+Os Qwen respondem `vulnerable: false` em 97,7% a 100% desses casos: a ausência de
+detecção é real, e não um artefato do critério de CWE. A única troca por CWE vizinha
+são 3 casos de hash em que o 7B reportou CWE-327. A CWE-338 não aparece em nenhuma
+resposta, e nenhuma resposta de nenhuma execução traz CWE fora das 11 listadas no
+prompt. O Llama aponta quase todos esses casos como vulneráveis, mas como injeção de
+SQL, sem relação com a categoria.
+
+O prompt v2 define como vulnerável o código em que a entrada não confiável alcança a
+operação sensível, definição que não descreve bem falhas de criptografia ou de
+aleatoriedade. O piloto v1, que não tinha essa frase, também respondeu
+`vulnerable: false` nos 6 casos reais dessas categorias presentes na amostra; o
+número é pequeno, mas indica que a definição não é a causa da ausência de detecção.
+
+Detalhes em `sem_deteccao_respostas.csv` e `sem_deteccao_cwes.csv`, em
+`resultados/analise/`.
+
+#### Casos negativos nas categorias de injeção
+
+Casos com `vulnerable: true`, independentemente da CWE:
+
+| Modelo | cmdi reais | cmdi negativos | sqli reais | sqli negativos | xpathi reais | xpathi negativos |
+|---|---|---|---|---|---|---|
+| Qwen2.5-Coder 14B | 126/126 | 125/125 | 271/272 | 225/232 | 14/15 | 16/20 |
+| Qwen2.5-Coder 7B | 126/126 | 125/125 | 272/272 | 232/232 | 15/15 | 20/20 |
+| Llama 3.1 8B | 126/126 | 125/125 | 272/272 | 232/232 | 15/15 | 20/20 |
+
+O 7B e o Llama apontam como vulneráveis 100% dos casos negativos deliberados das três
+categorias, e o 14B deixa de apontar apenas 7 dos 232 negativos de sqli e 4 dos 20 de
+xpathi. Os modelos praticamente não distinguem o código vulnerável de sua versão
+sanitizada. Detalhes em `resultados/analise/injecao_respostas.csv`.
 
 ### Estabilidade entre repetições
 
