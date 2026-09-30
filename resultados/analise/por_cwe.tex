@@ -1,0 +1,18 @@
+\begin{tabular}{rlrrrrrr}
+\hline
+ &  & \multicolumn{2}{c}{Qwen2.5-Coder 14B} & \multicolumn{2}{c}{Qwen2.5-Coder 7B} & \multicolumn{2}{c}{Llama 3.1 8B} \\
+CWE & Categoria & TPR & FPR & TPR & FPR & TPR & FPR \\
+\hline
+22 & Path traversal & 0,970 & 0,889 & 0,932 & 0,948 & 0,075 & 0,015 \\
+78 & Injeção de comando & 1,000 & 1,000 & 1,000 & 1,000 & 0,167 & 0,112 \\
+79 & XSS & 0,951 & 0,589 & 0,846 & 0,603 & 0,923 & 0,804 \\
+89 & Injeção de SQL & 0,996 & 0,970 & 1,000 & 1,000 & 1,000 & 1,000 \\
+90 & Injeção de LDAP & 0,963 & 0,844 & 0,519 & 0,562 & 0,333 & 0,125 \\
+327 & Criptografia fraca & 0,000 & 0,000 & 0,000 & 0,078 & 0,000 & 0,000 \\
+328 & Hash fraco & 0,016 & 0,000 & 0,000 & 0,000 & 0,000 & 0,000 \\
+330 & Aleatoriedade fraca & 0,000 & 0,000 & 0,000 & 0,000 & 0,037 & 0,127 \\
+501 & Fronteira de confiança & 0,000 & 0,000 & 0,012 & 0,000 & 0,000 & 0,000 \\
+614 & Cookie inseguro & 0,833 & 0,000 & 0,806 & 0,000 & 0,806 & 0,000 \\
+643 & Injeção de XPath & 0,933 & 0,800 & 1,000 & 1,000 & 1,000 & 1,000 \\
+\hline
+\end{tabular}

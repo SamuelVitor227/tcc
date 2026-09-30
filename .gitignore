@@ -3,7 +3,8 @@ testcode/
 expectedresults-1.2.csv
 
 # Saída bruta dos experimentos — manter apenas os resultados consolidados
-resultados/*.jsonl
+resultados/**/*.jsonl
+resultados/logs/
 
 # Python
 __pycache__/

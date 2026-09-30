@@ -57,11 +57,17 @@ tcc/
 ├── testcode/                  # 2.740 casos de teste (.java) do benchmark
 ├── expectedresults-1.2.csv    # gabarito oficial da v1.2
 ├── piloto.py                  # piloto v1 — prompt genérico
-├── piloto2.py                 # piloto v2 — prompt com as CWEs explicitadas
+├── piloto2.py                 # v2 — prompt com as CWEs explicitadas (usado no corpus completo)
+├── analise.py                 # métricas consolidadas, por CWE, tempo e concordância
+├── para_sarif.py              # converte a saída bruta para SARIF 2.1.0
 ├── ver.py                     # inspeção das respostas brutas
+├── benchmarkutils/
+│   └── LLMSarifReader.java    # leitor SARIF para o scorecard oficial
 └── resultados/
     ├── bruto_*.jsonl          # saída bruta do piloto v1
-    └── bruto_v2_*.jsonl       # saída bruta do piloto v2
+    ├── bruto_v2_*.jsonl       # saída bruta do corpus completo (não versionada)
+    ├── analise/               # tabelas em CSV e LaTeX geradas por analise.py
+    └── sarif/                 # SARIF gerado por para_sarif.py
 ```
 
 ## Como reproduzir
@@ -110,10 +116,39 @@ ollama pull llama3.1:8b
 
 ```powershell
 pip install requests
-python piloto2.py                             # 30 casos, Qwen 14B
-python piloto2.py --n 100                     # amostra maior
-python piloto2.py --modelo llama3.1:8b        # outro modelo
+python piloto2.py --n 2740 --modelo qwen2.5-coder:14b
+python piloto2.py --n 2740 --modelo qwen2.5-coder:7b
+python piloto2.py --n 2740 --modelo llama3.1:8b
 ```
+
+Cada execução sobrescreve o `resultados/bruto_v2_<modelo>.jsonl` do mesmo modelo.
+Sem `--n`, o script roda a amostra de 30 casos do piloto.
+
+### 5. Analisar
+
+```powershell
+python analise.py      # tabelas em resultados/analise/
+python para_sarif.py   # SARIF em resultados/sarif/
+```
+
+Os dois scripts só leem os `.jsonl`; a saída bruta nunca é alterada.
+
+### 6. Pontuar com o scorecard oficial
+
+O BenchmarkUtils não tem leitor SARIF genérico: cada leitor aceita apenas o
+`tool.driver.name` de uma ferramenta conhecida. Para que os modelos sejam pontuados
+pelo mesmo procedimento das ferramentas SAST, registra-se um leitor próprio:
+
+1. Copiar `benchmarkutils/LLMSarifReader.java` para
+   `plugin/src/main/java/org/owasp/benchmarkutils/score/parsers/sarif/` no BenchmarkUtils
+2. Em `parsers/Reader.java`, importar a classe e adicionar `new LLMSarifReader(),` à
+   lista de `allReaders()`
+3. `mvn install` no BenchmarkUtils
+4. Copiar `resultados/sarif/*.sarif` para `BenchmarkJava/results/` e executar
+   `./createScorecard.sh`
+
+O SARIF usa o mesmo formato de regra do CodeQL e do Semgrep (tag
+`external/cwe/cwe-N`), e o leitor não faz nenhum remapeamento de CWE.
 
 ## Protocolo
 
@@ -121,7 +156,8 @@ python piloto2.py --modelo llama3.1:8b        # outro modelo
 - Prompt definido previamente e reproduzido no apêndice do artigo
 - Saída bruta persistida em disco antes de qualquer processamento, permitindo
   reprocessar sem nova execução
-- Amostragem estratificada por categoria de CWE e por rótulo, com semente fixa
+- Corpus completo (2.740 casos) na avaliação final; no piloto, amostragem
+  estratificada por categoria de CWE e por rótulo, com semente fixa
 - Execuções sequenciais, sem processamento concorrente, para não interferir na
   medição de tempo
 
@@ -131,7 +167,83 @@ Apontar a CWE esperada em um caso real conta como verdadeiro positivo; apontá-l
 um caso negativo, como falso positivo. Não apontar, ou apontar CWE divergente, conta
 como falso negativo em caso real e verdadeiro negativo em caso negativo.
 
-## Resultados do estudo piloto
+## Resultados — corpus completo
+
+2.740 casos por modelo, prompt com as CWEs explicitadas, uma repetição. Nenhuma
+falha de interpretação da resposta nem de chamada ao modelo. As contagens foram
+conferidas contra os arquivos SARIF, aplicando o critério do scorecard.
+
+### Métricas consolidadas
+
+| Modelo | TP | FP | TN | FN | TPR | FPR | Precisão | F1 | Score | Score (OWASP) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Qwen2.5-Coder 14B | 832 | 636 | 689 | 583 | 0,588 | 0,480 | 0,567 | 0,577 | 10,8 | 14,3 |
+| Qwen2.5-Coder 7B | 789 | 658 | 667 | 626 | 0,558 | 0,497 | 0,545 | 0,551 | 6,1 | 8,4 |
+| Llama 3.1 8B | 591 | 475 | 850 | 824 | 0,418 | 0,358 | 0,554 | 0,476 | 5,9 | 10,5 |
+
+**Score** é TPR − FPR sobre o corpus inteiro, como calculado pelos scripts de piloto.
+**Score (OWASP)** é a média de TPR − FPR entre as 11 categorias, que é o cálculo do
+scorecard oficial. As duas medidas diferem porque as categorias têm tamanhos
+distintos; na comparação com as ferramentas SAST, vale a do scorecard.
+
+### Por categoria de CWE (TPR / FPR)
+
+| CWE | Categoria | Qwen 14B | Qwen 7B | Llama 8B |
+|---|---|---|---|---|
+| 22 | Path traversal | 0,970 / 0,889 | 0,932 / 0,948 | 0,075 / 0,015 |
+| 78 | Injeção de comando | 1,000 / 1,000 | 1,000 / 1,000 | 0,167 / 0,112 |
+| 79 | XSS | 0,951 / 0,589 | 0,846 / 0,603 | 0,923 / 0,804 |
+| 89 | Injeção de SQL | 0,996 / 0,970 | 1,000 / 1,000 | 1,000 / 1,000 |
+| 90 | Injeção de LDAP | 0,963 / 0,844 | 0,519 / 0,562 | 0,333 / 0,125 |
+| 327 | Criptografia fraca | 0,000 / 0,000 | 0,000 / 0,078 | 0,000 / 0,000 |
+| 328 | Hash fraco | 0,016 / 0,000 | 0,000 / 0,000 | 0,000 / 0,000 |
+| 330 | Aleatoriedade fraca | 0,000 / 0,000 | 0,000 / 0,000 | 0,037 / 0,127 |
+| 501 | Fronteira de confiança | 0,000 / 0,000 | 0,012 / 0,000 | 0,000 / 0,000 |
+| 614 | Cookie inseguro | 0,833 / 0,000 | 0,806 / 0,000 | 0,806 / 0,000 |
+| 643 | Injeção de XPath | 0,933 / 0,800 | 1,000 / 1,000 | 1,000 / 1,000 |
+
+**Injeção.** Nas categorias de injeção, os modelos Qwen detectam quase todos os casos
+reais, mas apontam também quase todos os corrigidos (FPR entre 0,56 e 1,00). Isso
+confirma no corpus completo o que o piloto indicava: os modelos avaliam a estrutura
+do código, e não se a sanitização é eficaz. Converge com o achado de Gnieciak e
+Szandala (2025), que reportam vantagem em recall ao custo de falsos positivos.
+
+**Criptografia e fronteira de confiança.** CWE-327, 328, 330 e 501 seguem
+praticamente sem detecção em todos os modelos, mesmo listadas no prompt.
+
+**Cookie inseguro.** CWE-614 é a única categoria com separação clara: TPR acima de
+0,8 e nenhum falso positivo nos três modelos.
+
+### Concordância entre Qwen 14B e 7B
+
+O piloto indicava classificação idêntica entre os dois modelos Qwen. **O corpus
+completo refuta esse resultado:** a classificação divergiu em 157 dos 2.740 casos
+(5,7%), e a resposta (vulnerável/CWE) em 165 (6,0%). As divergências se concentram em
+XSS (77), path traversal (29) e injeção de LDAP (23). A lista completa está em
+`resultados/analise/concordancia_qwen.csv`. Os modelos concordam em 94,3% dos casos,
+e a diferença de porte se reflete em um Score (OWASP) de 14,3 contra 8,4, em favor do
+14B.
+
+### Comportamento do Llama 3.1 8B
+
+O Llama marcou 2.692 dos 2.740 casos (98,2%) como vulneráveis, 1.975 deles como
+injeção de SQL. Em 1.626 respostas, a CWE apontada não era a do caso. O FPR menor
+que o dos Qwen não indica comportamento mais conservador, como o piloto sugeria:
+resulta de o modelo apontar a CWE errada, o que o critério conta como negativo. Nos
+Qwen, a CWE divergiu em apenas 3 (14B) e 18 (7B) respostas.
+
+### Tempo de execução
+
+| Modelo | Mediana | Média | Total |
+|---|---|---|---|
+| Qwen2.5-Coder 14B | 2,70 s | 2,71 s | 2,06 h |
+| Qwen2.5-Coder 7B | 2,38 s | 2,38 s | 1,81 h |
+| Llama 3.1 8B | 2,39 s | 2,39 s | 1,82 h |
+
+## Estudo piloto
+
+Registro da decisão metodológica sobre o prompt. A comparação entre modelos feita no
+piloto foi substituída pelos resultados do corpus completo, acima.
 
 Amostra de 30 casos, estratificada por categoria de CWE e por rótulo, com semente fixa.
 
@@ -152,42 +264,9 @@ triplicou a taxa de detecção. A versão com as CWEs explicitadas foi adotada p
 corresponder ao conjunto de regras que as ferramentas SAST carregam, tornando a
 comparação entre as abordagens equivalente.
 
-### Comparação entre modelos (prompt com CWEs)
-
-| Modelo | TPR | FPR | Precisão | F1 | Score | Mediana |
-|---|---|---|---|---|---|---|
-| Qwen2.5-Coder 14B | 0,600 | 0,533 | 0,529 | 0,562 | 6,7 | 2,7 s |
-| Qwen2.5-Coder 7B | 0,600 | 0,533 | 0,529 | 0,562 | 6,7 | 2,4 s |
-| Llama 3.1 8B | 0,333 | 0,267 | 0,556 | 0,417 | 6,7 | 2,4 s |
-
-Nenhum dos três apresentou falha de interpretação da resposta.
-
-**Escala.** Os dois modelos da família Qwen produziram classificação idêntica em
-todos os 30 casos, apesar da diferença de porte. A confirmação depende da execução
-sobre o corpus completo, dado o tamanho da amostra.
-
-**Especialização.** O modelo generalista detectou menos (TPR 0,333 contra 0,600), mas
-sinalizou menos casos negativos (FPR 0,267 contra 0,533), apresentando comportamento
-mais conservador.
-
-**Sobre o Benchmark Score.** Os três modelos obtiveram 6,7, embora com perfis
-distintos: o ganho em detecção veio acompanhado de aumento proporcional em falsos
-positivos. A observação reforça a decisão de reportar também precisão e F1-score.
-
-### Limitações observadas
-
-1. Os três modelos produzem resposta idêntica para o caso vulnerável e para sua
-   versão corrigida nas categorias de injeção, indicando avaliação da estrutura do
-   código e não da eficácia da sanitização. Converge com o achado de Gnieciak e
-   Szandala (2025), que reportam vantagem em recall ao custo de falsos positivos.
-2. As categorias de criptografia fraca (CWE-327), hash fraco (CWE-328), aleatoriedade
-   previsível (CWE-330) e violação de fronteira de confiança (CWE-501) não produziram
-   nenhuma detecção em nenhum dos modelos, mesmo listadas explicitamente no prompt.
-
-### Tempo de execução
-
-Mediana entre 2,4 s e 2,7 s por caso. Extrapolando para os 2.740 casos, três
-repetições e três modelos: aproximadamente 18 a 21 horas de processamento.
+O arquivo `piloto.py` tinha os acentos do prompt corrompidos por erro de codificação.
+Após a correção, o piloto v1 foi executado novamente e produziu resposta idêntica nos
+30 casos, com as mesmas métricas da tabela acima.
 
 ## Divisão de responsabilidades
 
