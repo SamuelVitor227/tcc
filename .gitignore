@@ -2,8 +2,7 @@
 testcode/
 expectedresults-1.2.csv
 
-# Saída bruta dos experimentos — manter apenas os resultados consolidados
-resultados/**/*.jsonl
+# Logs de console das execuções (a saída bruta .jsonl é versionada)
 resultados/logs/
 
 # Python

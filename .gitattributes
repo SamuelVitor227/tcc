@@ -1,0 +1,2 @@
+# Saída bruta: gravada e restaurada byte a byte, sem conversão de quebra de linha
+*.jsonl -text
