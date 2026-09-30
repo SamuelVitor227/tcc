@@ -189,7 +189,7 @@ como falso negativo em caso real e verdadeiro negativo em caso negativo.
 
 ## Resultados — corpus completo
 
-2.740 casos por modelo, prompt com as CWEs explicitadas, uma repetição. Nenhuma
+2.740 casos por modelo, prompt com as CWEs explicitadas, execução v2. Nenhuma
 falha de interpretação da resposta nem de chamada ao modelo. As contagens foram
 conferidas contra os arquivos SARIF, aplicando o critério do scorecard.
 
@@ -259,6 +259,48 @@ Qwen, a CWE divergiu em apenas 3 (14B) e 18 (7B) respostas.
 | Qwen2.5-Coder 14B | 2,70 s | 2,71 s | 2,06 h |
 | Qwen2.5-Coder 7B | 2,38 s | 2,38 s | 1,81 h |
 | Llama 3.1 8B | 2,39 s | 2,39 s | 1,82 h |
+
+### Estabilidade entre repetições
+
+Além da execução v2, cada modelo foi executado três vezes sobre o corpus completo,
+com o mesmo prompt, temperatura zero e a mesma ordem de casos (`repeticoes.py`). As
+nove repetições classificaram os 2.740 casos sem falha de interpretação nem de
+chamada ao modelo.
+
+| Modelo | Classificação variou | Veredito variou | CWE variou | Difere da v2 |
+|---|---|---|---|---|
+| Qwen2.5-Coder 14B | 0 (0,00%) | 0 (0,00%) | 0 (0,00%) | 8 (0,29%) |
+| Qwen2.5-Coder 7B | 6 (0,22%) | 5 (0,18%) | 1 (0,04%) | 6 (0,22%) |
+| Llama 3.1 8B | 12 (0,44%) | 1 (0,04%) | 14 (0,51%) | 12 (0,44%) |
+
+*Classificação variou*: TP/FP/TN/FN não é a mesma nas três repetições. *Veredito
+variou*: o campo `vulnerable` mudou. *CWE variou*: vulnerável nas três repetições,
+mas com CWEs diferentes. *Difere da v2*: a classificação da execução v2 difere da de
+ao menos uma repetição. Os casos estão em `resultados/analise/estabilidade_divergentes.csv`.
+
+Faixa das métricas nas quatro execuções (v2 e as três repetições):
+
+| Modelo | TPR | FPR | F1 | Score | Score (OWASP) |
+|---|---|---|---|---|---|
+| Qwen2.5-Coder 14B | 0,588–0,591 | 0,480 | 0,577–0,579 | 10,8–11,1 | 14,3–14,9 |
+| Qwen2.5-Coder 7B | 0,558 | 0,494–0,497 | 0,551–0,552 | 6,1–6,4 | 8,4–9,1 |
+| Llama 3.1 8B | 0,416–0,418 | 0,358 | 0,475–0,476 | 5,8–5,9 | 9,7–10,5 |
+
+**Temperatura zero não garante resposta idêntica.** Apenas o Qwen 14B repetiu a
+mesma resposta nos 2.740 casos nas três repetições. No 7B, a variação está no
+veredito; no Llama, quase toda na escolha da CWE, coerente com o comportamento de
+apontar quase todos os casos como vulneráveis.
+
+**Execução v2 do Qwen 14B.** As três repetições do 14B são idênticas entre si, mas
+diferem da v2 em 8 casos, distribuídos ao longo da execução e entre categorias, sem
+alteração de tempo de resposta. O código, o modelo e a versão do Ollama (0.34.4) são
+os mesmos. A causa não foi identificada; uma hipótese é o não determinismo
+numérico da inferência em GPU entre sessões de carregamento do modelo.
+
+**Efeito nas métricas.** A variação é pequena e não altera a ordem entre os modelos
+em nenhuma das execuções: 14B > 7B > Llama pelo Score e 14B > Llama > 7B pelo Score
+(OWASP). O Score (OWASP) é mais sensível, com variação de até 0,8 ponto, porque a
+média por categoria amplia mudanças nas categorias menores.
 
 ## Estudo piloto
 
