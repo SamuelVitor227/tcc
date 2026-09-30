@@ -58,15 +58,19 @@ tcc/
 ├── expectedresults-1.2.csv    # gabarito oficial da v1.2
 ├── piloto.py                  # piloto v1 — prompt genérico
 ├── piloto2.py                 # v2 — prompt com as CWEs explicitadas (usado no corpus completo)
+├── repeticoes.py              # repetições do corpus completo (mesmo prompt da v2)
 ├── analise.py                 # métricas consolidadas, por CWE, tempo e concordância
+├── estabilidade.py            # variação das respostas entre repetições
 ├── para_sarif.py              # converte a saída bruta para SARIF 2.1.0
 ├── ver.py                     # inspeção das respostas brutas
 ├── benchmarkutils/
 │   └── LLMSarifReader.java    # leitor SARIF para o scorecard oficial
 └── resultados/
     ├── bruto_*.jsonl          # saída bruta do piloto v1
-    ├── bruto_v2_*.jsonl       # saída bruta do corpus completo (não versionada)
-    ├── analise/               # tabelas em CSV e LaTeX geradas por analise.py
+    ├── bruto_v2_*.jsonl       # saída bruta do corpus completo
+    ├── bruto_rep_*_r<n>.jsonl # saída bruta de cada repetição
+    ├── piloto_30casos/        # saída bruta do piloto v2
+    ├── analise/               # tabelas em CSV e LaTeX (analise.py e estabilidade.py)
     └── sarif/                 # SARIF gerado por para_sarif.py
 ```
 
@@ -124,14 +128,29 @@ python piloto2.py --n 2740 --modelo llama3.1:8b
 Cada execução sobrescreve o `resultados/bruto_v2_<modelo>.jsonl` do mesmo modelo.
 Sem `--n`, o script roda a amostra de 30 casos do piloto.
 
+Repetições, para medir a estabilidade das respostas:
+
+```powershell
+python repeticoes.py --modelo qwen2.5-coder:14b    # repetições 1 a 3
+python repeticoes.py --modelo qwen2.5-coder:7b
+python repeticoes.py --modelo llama3.1:8b
+```
+
+O `repeticoes.py` importa prompt, temperatura, ordem dos casos, interpretação e
+classificação do `piloto2.py`, de modo que as repetições são idênticas à execução v2.
+Cada repetição grava `resultados/bruto_rep_<modelo>_r<n>.jsonl`; um arquivo existente
+nunca é sobrescrito, e a repetição correspondente é pulada.
+
 ### 5. Analisar
 
 ```powershell
 python analise.py      # tabelas em resultados/analise/
 python para_sarif.py   # SARIF em resultados/sarif/
+python estabilidade.py # estabilidade entre repetições, em resultados/analise/
 ```
 
-Os dois scripts só leem os `.jsonl`; a saída bruta nunca é alterada.
+Os scripts só leem os `.jsonl`; a saída bruta nunca é alterada. Ela é versionada no
+repositório byte a byte (`.gitattributes` desativa a conversão de quebra de linha).
 
 ### 6. Pontuar com o scorecard oficial
 
@@ -153,6 +172,7 @@ O SARIF usa o mesmo formato de regra do CodeQL e do Semgrep (tag
 ## Protocolo
 
 - Temperatura fixada em zero
+- Três repetições por modelo sobre o corpus completo, além da execução v2
 - Prompt definido previamente e reproduzido no apêndice do artigo
 - Saída bruta persistida em disco antes de qualquer processamento, permitindo
   reprocessar sem nova execução
